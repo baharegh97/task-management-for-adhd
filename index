@@ -282,6 +282,102 @@
             box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4);
         }
 
+        /* ===== Bulk Add ===== */
+        .bulk-add-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 2px dashed #e0e0e0;
+        }
+
+        .bulk-add-section summary {
+            cursor: pointer;
+            color: var(--primary);
+            font-weight: 500;
+            padding: 0.5rem 0;
+            user-select: none;
+        }
+
+        .bulk-add-section summary:hover {
+            color: var(--primary-dark);
+        }
+
+        .bulk-add-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .bulk-add-area textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 0.8rem 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            resize: vertical;
+            transition: var(--transition);
+            background: #fafafa;
+            line-height: 1.6;
+        }
+
+        .bulk-add-area textarea:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
+            background: white;
+        }
+
+        .bulk-add-area .bulk-actions {
+            display: flex;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .bulk-add-area .bulk-actions .btn-bulk-add {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 0.6rem 2rem;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .bulk-add-area .bulk-actions .btn-bulk-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3);
+        }
+
+        .bulk-add-area .bulk-actions .bulk-count {
+            font-size: 0.85rem;
+            color: #888;
+            padding: 0.3rem 1rem;
+            background: #f0f0f0;
+            border-radius: 50px;
+        }
+
+        .bulk-add-area .bulk-hint {
+            font-size: 0.8rem;
+            color: #999;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .bulk-add-area .bulk-hint code {
+            background: #f0f0f0;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
         /* ===== Next Step Card ===== */
         .next-step-card {
             background: linear-gradient(135deg, var(--primary), #a29bfe);
@@ -963,6 +1059,7 @@
             .task-main { flex-wrap: wrap; }
             .report-stats { grid-template-columns: 1fr 1fr; }
             .sync-section { justify-content: center; }
+            .bulk-add-area .bulk-actions { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
@@ -1023,6 +1120,29 @@
         <small style="color: #888; margin-top: 0.5rem; display: block;">
             ⏎ Press Enter to add | 📋 Add subtasks later by clicking 📋 on the task
         </small>
+
+        <!-- ===== Bulk Add ===== -->
+        <div class="bulk-add-section">
+            <details>
+                <summary>📋 Bulk Add Multiple Tasks</summary>
+                <div class="bulk-add-area">
+                    <textarea id="bulkTextarea" placeholder="Paste your tasks here, one per line or separated by commas&#10;Example:&#10;Task 1&#10;Task 2&#10;Task 3&#10;&#10;Or: Task 1, Task 2, Task 3"></textarea>
+                    <div class="bulk-actions">
+                        <button class="btn-bulk-add" id="bulkAddBtn">📥 Add All Tasks</button>
+                        <span class="bulk-count" id="bulkCount">0 tasks detected</span>
+                    </div>
+                    <div class="bulk-hint">
+                        <span>💡 Supports:</span>
+                        <code>new lines</code>
+                        <code>commas</code>
+                        <code>semicolons</code>
+                        <code>• bullet points</code>
+                        <code>- dashes</code>
+                        <code>numbers (1. 2. 3.)</code>
+                    </div>
+                </div>
+            </details>
+        </div>
     </div>
 
     <!-- ===== Next Step ===== -->
@@ -1043,7 +1163,7 @@
             </div>
         </div>
         
-        <!-- Current Subtask - Only One -->
+        <!-- Current Subtask -->
         <div id="nextStepSubtaskContainer">
             <div class="next-step-no-subtask" id="nextStepNoSubtask">
                 ✨ No subtasks - click 📋 on the task to add some
@@ -1116,7 +1236,7 @@
 
 <script>
     // ============================================================
-    // ADHD Task Manager - English Version with Subtask Reorder
+    // ADHD Task Manager - English Version with Bulk Add & Reorder
     // ============================================================
 
     class ADHDTaskManager {
@@ -1162,6 +1282,8 @@
             this.totalCount = document.getElementById('totalCount');
             this.pomodoroTimer = document.getElementById('pomodoroTimer');
             this.pomodoroStatus = document.getElementById('pomodoroStatus');
+            this.bulkTextarea = document.getElementById('bulkTextarea');
+            this.bulkCount = document.getElementById('bulkCount');
 
             // Load data
             this.loadFromStorage();
@@ -1177,8 +1299,81 @@
             this.render();
             this.updatePomodoroDisplay();
             this.generateWeeklyReport();
+            this.updateBulkCount();
 
             window.app = this;
+        }
+
+        // ---------- Bulk Add Detection ----------
+        updateBulkCount() {
+            const text = this.bulkTextarea.value.trim();
+            const tasks = this.parseBulkTasks(text);
+            this.bulkCount.textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''} detected`;
+            return tasks;
+        }
+
+        parseBulkTasks(text) {
+            if (!text.trim()) return [];
+            
+            // Split by new lines, commas, semicolons, or bullet points
+            let tasks = text
+                .split(/[\n,;•\-]/) // Split by newline, comma, semicolon, bullet, dash
+                .map(t => t.trim())
+                .filter(t => t.length > 0)
+                .map(t => {
+                    // Remove leading numbers like "1. ", "2. ", "3- ", etc.
+                    return t.replace(/^\d+[\.\-\s]+/, '').trim();
+                })
+                .filter(t => t.length > 0);
+            
+            // If only one item and it contains commas, split by comma
+            if (tasks.length === 1 && tasks[0].includes(',')) {
+                tasks = tasks[0].split(',').map(t => t.trim()).filter(t => t.length > 0);
+            }
+            
+            return tasks;
+        }
+
+        bulkAddTasks() {
+            const text = this.bulkTextarea.value.trim();
+            if (!text) {
+                this.showToast('⚠️ Please paste some tasks first');
+                return;
+            }
+
+            const tasks = this.parseBulkTasks(text);
+            if (tasks.length === 0) {
+                this.showToast('⚠️ No valid tasks found');
+                return;
+            }
+
+            let addedCount = 0;
+            tasks.forEach(taskText => {
+                const task = {
+                    id: this.taskIdCounter++,
+                    text: taskText,
+                    priority: this.selectedPriority,
+                    completed: false,
+                    createdAt: new Date().toISOString(),
+                    subtasks: [],
+                    pomodoroCount: 0
+                };
+                this.tasks.push(task);
+                addedCount++;
+            });
+
+            if (this.tasks.length > 0 && this.nextTaskIndex === 0) {
+                this.nextTaskIndex = 0;
+                this.currentSubtaskIndex = 0;
+            }
+
+            this.bulkTextarea.value = '';
+            this.updateBulkCount();
+            this.render();
+            this.saveToStorage();
+            this.showToast(`✅ ${addedCount} tasks added! 🎉`);
+            this.createConfetti(Math.min(30, addedCount * 3));
+            this.generateWeeklyReport();
         }
 
         // ---------- Sample Task ----------
@@ -1406,7 +1601,7 @@
             return null;
         }
 
-        // ---------- Subtasks with Reorder (Drag & Drop) ----------
+        // ---------- Subtasks with Reorder ----------
         addSubtask(taskId) {
             const container = document.querySelector(`[data-task-id="${taskId}"] .add-subtask`);
             if (!container) return;
@@ -1497,7 +1692,6 @@
                 subtaskId: subtaskId
             }));
             
-            // Store for visual feedback
             this.draggedItem = item;
         }
 
@@ -1518,7 +1712,6 @@
         dropSubtask(e) {
             e.preventDefault();
             
-            // Remove drag-over from all
             document.querySelectorAll('.subtask-item.drag-over').forEach(el => {
                 el.classList.remove('drag-over');
             });
@@ -1538,17 +1731,14 @@
             const task = this.tasks.find(t => t.id === taskId);
             if (!task) return;
 
-            // Find indices
             const fromIndex = task.subtasks.findIndex(s => s.id === subtaskId);
             const toIndex = task.subtasks.findIndex(s => s.id === targetSubtaskId);
             
             if (fromIndex === -1 || toIndex === -1) return;
 
-            // Reorder
             const [movedItem] = task.subtasks.splice(fromIndex, 1);
             task.subtasks.splice(toIndex, 0, movedItem);
 
-            // Update current subtask index if needed
             const nextTask = this.getNextTask();
             if (nextTask && nextTask.id === taskId) {
                 const pendingIndex = task.subtasks.findIndex(s => !s.completed);
@@ -2130,6 +2320,16 @@ END:VEVENT
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     this.addTask();
+                }
+            });
+
+            // Bulk Add
+            document.getElementById('bulkAddBtn').addEventListener('click', () => this.bulkAddTasks());
+            this.bulkTextarea.addEventListener('input', () => this.updateBulkCount());
+            this.bulkTextarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    e.preventDefault();
+                    this.bulkAddTasks();
                 }
             });
 
